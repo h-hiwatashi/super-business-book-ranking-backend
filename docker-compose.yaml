@@ -1,0 +1,47 @@
+version: "3"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: book-ranking-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    restart: always
+    networks:
+      - book-ranking-network
+
+  db:
+    image: mysql:8.0
+    container_name: book-ranking-db
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+    networks:
+      - book-ranking-network
+
+volumes:
+  mysql-data:
+
+networks:
+  book-ranking-network:
+    driver: bridge
