@@ -59,6 +59,7 @@ type RankingResponse struct {
 var db *sql.DB
 
 func main() {
+
 	// データベース接続
 	dataSourceName := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?%s", 
 		dbUser, dbPass, dbHost, dbPort, dbName, dbParams)
