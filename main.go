@@ -11,17 +11,23 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
+	"github.com/google/uuid"
+
+	"super-business-book-ranking-backend/rakuten"
+	"super-business-book-ranking-backend/ranking"
 )
 
 // 環境変数の設定とデフォルト値
 var (
-	port     = getEnv("PORT", "8080")
-	dbHost   = getEnv("DB_HOST", "localhost")
-	dbPort   = getEnv("DB_PORT", "3306")
-	dbUser   = getEnv("DB_USER", "root")
-	dbPass   = getEnv("DB_PASS", "password")
-	dbName   = getEnv("DB_NAME", "book_ranking")
-	dbParams = getEnv("DB_PARAMS", "parseTime=true&loc=Asia%2FTokyo")
+	port                  = getEnv("PORT", "8080")
+	dbHost                = getEnv("DB_HOST", "localhost")
+	dbPort                = getEnv("DB_PORT", "3306")
+	dbUser                = getEnv("DB_USER", "root")
+	dbPass                = getEnv("DB_PASS", "password")
+	dbName                = getEnv("DB_NAME", "book_ranking")
+	dbParams              = getEnv("DB_PARAMS", "parseTime=true&loc=Asia%2FTokyo")
+	rakutenApplicationID  = getEnv("RAKUTEN_APPLICATION_ID", "")
+	rankingUpdateInterval = getEnv("RANKING_UPDATE_INTERVAL", "6h") // デフォルト6時間ごとに更新
 )
 
 // ヘルスチェックレスポンス
@@ -55,8 +61,24 @@ type RankingResponse struct {
 	Books        []RankedBook `json:"books"`
 }
 
+// 手動更新リクエスト
+type UpdateRankingRequest struct {
+	Genre      string `json:"genre"`
+	PeriodType string `json:"periodType"`
+}
+
+// 更新レスポンス
+type UpdateRankingResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 // データベース接続用のグローバル変数
-var db *sql.DB
+var (
+	db                *sql.DB
+	rankingScheduler  *ranking.RankingScheduler
+	rankingService    *ranking.RankingService
+)
 
 func main() {
 	// データベース接続
@@ -77,6 +99,24 @@ func main() {
 	}
 	log.Println("データベース接続成功")
 
+	// 楽天クライアントの初期化
+	rakutenClient := rakuten.NewClient(rakutenApplicationID)
+
+	// ランキングサービスの初期化
+	rankingService = ranking.NewRankingService(db, rakutenClient)
+
+	// ランキングスケジューラーの初期化と開始
+	interval, err := time.ParseDuration(rankingUpdateInterval)
+	if err != nil {
+		log.Printf("ランキング更新間隔の解析エラー: %v, デフォルト値(6時間)を使用します。", err)
+		interval = 6 * time.Hour
+	}
+	rankingScheduler = ranking.NewRankingScheduler(rankingService, interval)
+	
+	// 別のゴルーチンでスケジューラーを実行
+	go rankingScheduler.Start()
+	defer rankingScheduler.Stop()
+
 	// ルーターの設定
 	r := mux.NewRouter()
 	
@@ -85,6 +125,9 @@ func main() {
 	r.HandleFunc("/api/rankings/{categoryId}", getRankingsHandler).Methods("GET")
 	r.HandleFunc("/api/books/{bookId}", getBookDetailsHandler).Methods("GET")
 	r.HandleFunc("/api/categories", getCategoriesHandler).Methods("GET")
+
+	// ランキング更新用の新しいエンドポイント
+	r.HandleFunc("/api/admin/update-ranking", updateRankingHandler).Methods("POST")
 
 	// サーバー起動
 	log.Printf("サーバーを起動しています。ポート: %s\n", port)
@@ -274,4 +317,35 @@ func getCategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(categories)
+}
+
+// ランキング更新ハンドラー
+func updateRankingHandler(w http.ResponseWriter, r *http.Request) {
+	// リクエストの解析
+	var req UpdateRankingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "不正なリクエスト形式", http.StatusBadRequest)
+		return
+	}
+	
+	// ジャンルとperiodTypeの検証
+	if req.Genre == "" {
+		req.Genre = "all" // デフォルト値
+	}
+	
+	if req.PeriodType == "" {
+		req.PeriodType = "daily" // デフォルト値
+	}
+	
+	// バックグラウンドでランキング更新を実行
+	go rankingScheduler.UpdateRanking(req.Genre, req.PeriodType)
+	
+	// 即座にレスポンスを返す
+	response := UpdateRankingResponse{
+		Success: true,
+		Message: fmt.Sprintf("ランキング更新を開始しました（ジャンル: %s, 期間: %s）", req.Genre, req.PeriodType),
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
