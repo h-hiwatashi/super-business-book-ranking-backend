@@ -11,6 +11,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
+	
+	"github.com/h-hiwatashi/super-business-book-ranking-backend/api/rakuten"
 )
 
 // 環境変数の設定とデフォルト値
@@ -81,11 +83,15 @@ func main() {
 	// ルーターの設定
 	r := mux.NewRouter()
 	
+	rakutenHandler := rakuten.NewRakutenHandler()
+	
 	// APIエンドポイント
 	r.HandleFunc("/health", healthCheckHandler).Methods("GET")
 	r.HandleFunc("/api/rankings/{categoryId}", getRankingsHandler).Methods("GET")
 	r.HandleFunc("/api/books/{bookId}", getBookDetailsHandler).Methods("GET")
 	r.HandleFunc("/api/categories", getCategoriesHandler).Methods("GET")
+	
+	r.HandleFunc("/api/rakuten/rankings/{categoryId}", rakutenHandler.GetRakutenBookRankingHandler).Methods("GET")
 
 	// サーバー起動
 	log.Printf("サーバーを起動しています。ポート: %s\n", port)
