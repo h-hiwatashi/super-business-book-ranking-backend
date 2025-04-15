@@ -64,6 +64,16 @@ func (c *RakutenClient) GetBookRankingJSON(categoryID string, periodType string)
 func generateMockBookRanking(categoryID string, periodType string) *RakutenBookRankingResponse {
 	rand.Seed(time.Now().UnixNano())
 	
+	validPeriods := map[string]bool{
+		"daily":   true,
+		"weekly":  true,
+		"monthly": true,
+	}
+	
+	if !validPeriods[periodType] {
+		periodType = "daily" // デフォルト値
+	}
+	
 	categoryNames := map[string]string{
 		"001": "ビジネス書",
 		"002": "自己啓発",
@@ -211,10 +221,27 @@ func generateMockBookRanking(categoryID string, periodType string) *RakutenBookR
 		},
 	}
 	
+	switch periodType {
+	case "daily":
+	case "weekly":
+		rand.Shuffle(len(businessBooks), func(i, j int) {
+			if rand.Intn(3) == 0 { // 33%の確率で入れ替え
+				businessBooks[i], businessBooks[j] = businessBooks[j], businessBooks[i]
+			}
+		})
+	case "monthly":
+		rand.Shuffle(len(businessBooks), func(i, j int) {
+			if rand.Intn(2) == 0 { // 50%の確率で入れ替え
+				businessBooks[i], businessBooks[j] = businessBooks[j], businessBooks[i]
+			}
+		})
+	}
+	
 	for i, book := range businessBooks {
 		book.Rank = i + 1
 		items = append(items, RakutenBookItem{Item: book})
 	}
+	
 	
 	response := &RakutenBookRankingResponse{
 		Items: items,
