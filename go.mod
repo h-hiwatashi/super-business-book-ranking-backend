@@ -1,4 +1,4 @@
-module github.com/your-username/super-business-book-ranking
+module github.com/h-hiwatashi/super-business-book-ranking-backend
 
 go 1.21
 
