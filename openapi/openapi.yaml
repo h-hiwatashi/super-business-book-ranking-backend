@@ -1,0 +1,378 @@
+openapi: 3.0.0
+info:
+  title: 書籍ランキングAPI
+  description: |
+    日本の主要ECサイト（アマゾン、楽天市場、Yahooショッピング）のAPIを使用し、
+    書籍の売り上げを取得してランキングを作成するサービスのAPIです。
+  version: 1.0.0
+  contact:
+    name: Hiromitsu Hiwatashi
+servers:
+  - url: http://localhost:8080
+    description: 開発環境
+  - url: https://api.example.com
+    description: 本番環境
+tags:
+  - name: 健康チェック
+    description: サーバーの状態確認
+  - name: ランキング
+    description: 書籍ランキングの取得
+  - name: 書籍
+    description: 書籍の詳細情報
+  - name: カテゴリ
+    description: 書籍カテゴリ情報
+  - name: 楽天市場
+    description: 楽天市場の書籍ランキング
+
+paths:
+  /health:
+    get:
+      tags:
+        - 健康チェック
+      summary: サーバーの状態確認
+      description: サーバーが正常に動作しているかを確認します
+      responses:
+        '200':
+          description: サーバーが正常に動作している
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  message:
+                    type: string
+                    example: "サーバーは正常に動作しています"
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/rankings/{categoryId}:
+    get:
+      tags:
+        - ランキング
+      summary: 書籍ランキングの取得
+      description: 指定されたカテゴリの書籍ランキングを取得します
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          description: カテゴリID
+          schema:
+            type: string
+            example: "001"
+        - name: period
+          in: query
+          required: false
+          description: 期間（daily, weekly, monthly）
+          schema:
+            type: string
+            enum: [daily, weekly, monthly]
+            default: daily
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookRanking'
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: カテゴリが見つかりません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/books/{bookId}:
+    get:
+      tags:
+        - 書籍
+      summary: 書籍詳細の取得
+      description: 指定された書籍IDの詳細情報を取得します
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          description: 書籍ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404':
+          description: 書籍が見つかりません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/categories:
+    get:
+      tags:
+        - カテゴリ
+      summary: カテゴリ一覧の取得
+      description: 利用可能な書籍カテゴリの一覧を取得します
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/rakuten/rankings/{categoryId}:
+    get:
+      tags:
+        - 楽天市場
+      summary: 楽天市場の書籍ランキング取得
+      description: 楽天市場の指定されたカテゴリの書籍ランキングを取得します
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          description: カテゴリID
+          schema:
+            type: string
+            example: "001"
+            description: |
+              カテゴリID一覧:
+              - 001: ビジネス書
+              - 002: 自己啓発
+              - 003: マーケティング
+              - 004: 経済・金融
+              - 005: IT・テクノロジー
+        - name: period
+          in: query
+          required: false
+          description: 期間（daily, weekly, monthly）
+          schema:
+            type: string
+            enum: [daily, weekly, monthly]
+            default: daily
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RakutenBookRanking'
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: エラーメッセージ
+        code:
+          type: integer
+          description: エラーコード
+      required:
+        - error
+
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 書籍ID
+        title:
+          type: string
+          description: タイトル
+        author:
+          type: string
+          description: 著者
+        publisher:
+          type: string
+          description: 出版社
+        isbn:
+          type: string
+          description: ISBN
+        price:
+          type: integer
+          description: 価格
+        url:
+          type: string
+          description: 商品URL
+        imageUrl:
+          type: string
+          description: 画像URL
+        salesDate:
+          type: string
+          description: 発売日
+        description:
+          type: string
+          description: 説明文
+      required:
+        - id
+        - title
+        - author
+
+    BookRanking:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+        count:
+          type: integer
+          description: 総数
+        page:
+          type: integer
+          description: ページ番号
+        totalPages:
+          type: integer
+          description: 総ページ数
+        categoryId:
+          type: string
+          description: カテゴリID
+        period:
+          type: string
+          description: 期間
+      required:
+        - items
+        - count
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          description: カテゴリID
+        name:
+          type: string
+          description: カテゴリ名
+        count:
+          type: integer
+          description: 書籍数
+      required:
+        - id
+        - name
+
+    RakutenBook:
+      type: object
+      properties:
+        title:
+          type: string
+          description: タイトル
+        author:
+          type: string
+          description: 著者
+        publisherName:
+          type: string
+          description: 出版社
+        isbn:
+          type: string
+          description: ISBN
+        itemPrice:
+          type: integer
+          description: 価格
+        itemUrl:
+          type: string
+          description: 商品URL
+        largeImageUrl:
+          type: string
+          description: 画像URL
+        salesDate:
+          type: string
+          description: 発売日
+        rank:
+          type: integer
+          description: ランキング
+        reviewCount:
+          type: integer
+          description: レビュー数
+        reviewAverage:
+          type: number
+          format: float
+          description: 平均評価
+        itemCaption:
+          type: string
+          description: 説明文
+      required:
+        - title
+        - author
+        - rank
+
+    RakutenBookItem:
+      type: object
+      properties:
+        Item:
+          $ref: '#/components/schemas/RakutenBook'
+      required:
+        - Item
+
+    RakutenBookRanking:
+      type: object
+      properties:
+        Items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RakutenBookItem'
+        count:
+          type: integer
+          description: 総数
+        page:
+          type: integer
+          description: ページ番号
+        first:
+          type: integer
+          description: 最初のアイテム番号
+        last:
+          type: integer
+          description: 最後のアイテム番号
+        hits:
+          type: integer
+          description: ヒット数
+      required:
+        - Items
+        - count
